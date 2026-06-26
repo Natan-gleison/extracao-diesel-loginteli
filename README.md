@@ -1,202 +1,111 @@
-# extracao-diesel-loginteli
+# Monitoramento de Preços de Diesel (Python)
 
-📌 Sobre o Projeto
+Robô em Python para coletar o preço médio semanal de diesel (S10) por estado, no site público [loginteli.com.br](https://www.loginteli.com.br/), e consolidar o resultado por unidade/filial em uma planilha Excel.
 
-Este projeto realiza a extração automatizada de preços médios de diesel por estado a partir do portal Loginteli, transformando os dados em uma base estruturada para análise e armazenamento em banco de dados SQLite.
+Este projeto é a tradução completa para Python de uma consulta originalmente feita em **Power Query (M)**, mantendo a mesma lógica de negócio:
 
-O objetivo é demonstrar habilidades em:
+- 1 requisição por **estado** e por **semana** (nunca por unidade, evitando chamadas duplicadas quando várias unidades ficam no mesmo estado).
+- Junção (`merge`) do preço do estado com a tabela de unidades — cada unidade do estado recebe o mesmo preço médio.
+- Quebra do período em colunas `Inicio Periodo` / `Fim Periodo`.
+- Cálculo de "semana do ano" equivalente ao `Date.WeekOfYear` padrão do Power Query (semana começando no domingo).
 
-Python
-Web Scraping
-ETL (Extract, Transform, Load)
-Banco de Dados SQLite
-SQLAlchemy
-Automação de Processos
-Tratamento de Erros
-Logging
-Boas Práticas de Desenvolvimento
+## 📂 Estrutura do projeto
 
-O projeto foi desenvolvido com foco em cenários reais de Supply Chain, Transportes e Análise de Dados.
-
-🚀 Funcionalidades
-Consulta automática de preços médios de diesel por estado.
-Processamento de múltiplos períodos semanais.
-Replicação dos preços para todas as unidades de negócio vinculadas ao estado.
-Armazenamento estruturado em banco SQLite.
-Registro de logs de execução.
-Tratamento de falhas e tentativas automáticas de reconexão.
-Arquitetura modular para fácil manutenção.
-🏗 Arquitetura
-Fonte Web (Loginteli)
-          │
-          ▼
-     Extração
-          │
-          ▼
-   Transformação
-          │
-          ▼
-    Pandas DataFrame
-          │
-          ▼
-       SQLite
-          │
-          ▼
-    Power BI / SQL
-
-    
-📂 Estrutura do Projeto
-
-extracao-diesel-loginteli/
+```
+monitoramento-precos-diesel-python/
 │
 ├── data/
-│   └── diesel.db
+│   └── output/               # Planilhas Excel geradas
 │
 ├── logs/
-│   └── app.log
+│   └── execucao.log          # Log de cada execução
 │
 ├── src/
-│   ├── config.py
-│   ├── extractor.py
-│   ├── database.py
-│   ├── logger.py
-│   └── main.py
+│   ├── config.py             # Unidades por estado, semanas a consultar, parâmetros da requisição
+│   ├── scraper.py            # Requisição HTTP e extração do valor (equivalente à função Consulta1/fnBuscarDiesel)
+│   ├── parser.py             # Junção com unidades, seleção/ordenação de colunas, split de período
+│   ├── exporter.py           # Exportação do resultado final para Excel
+│   └── utils.py              # Logging, timestamp e cálculo de semana do ano
 │
 ├── tests/
-│   └── test_extractor.py
+│   ├── test_utils.py
+│   ├── test_scraper.py
+│   └── test_parser.py
 │
-├── .env
+├── main.py                    # Ponto de entrada (orquestra todo o fluxo)
 ├── requirements.txt
-├── README.md
-└── .gitignore
+└── README.md
+```
 
+## 🔁 Equivalência com o Power Query original
 
-⚙️ Tecnologias Utilizadas
-Python 3.11+
-Pandas
-Requests
-SQLAlchemy
-SQLite
-Tenacity
-Pytest
-Python Dotenv
+| Power Query (M)                                   | Python                                  |
+|-----------------------------------------------------|------------------------------------------|
+| `Consulta1` / query `fnBuscarDiesel`                | `src/scraper.py::buscar_preco_diesel`    |
+| `TabelaUnidades`                                    | `src/config.py::UNIDADES_POR_ESTADO`     |
+| `Semanas`                                           | `src/config.py::SEMANAS`                 |
+| `Estados` (`List.Distinct`)                         | `src/parser.py::estados_distintos`       |
+| `Registros` (`List.Combine`/`List.Transform`)       | `main.py::coletar_registros`             |
+| `ComUnidades` (`Table.Join`, `JoinKind.Inner`)      | `src/parser.py::montar_tabela_final` (merge) |
+| `Selecionada` / `Tipada` / `Ordenada`               | `src/parser.py::montar_tabela_final`     |
+| `Dividir Coluna por Delimitador` (`PERIODO` → datas)| `src/parser.py::montar_tabela_final`     |
+| `Date.WeekOfYear`                                   | `src/utils.py::semana_do_ano`            |
 
+## 🚀 Como usar
 
-📥 Instalação
+1. Clone o repositório e crie um ambiente virtual (recomendado):
 
-Clone o repositório:
+   ```bash
+   git clone https://github.com/seu-usuario/monitoramento-precos-diesel-python.git
+   cd monitoramento-precos-diesel-python
+   python -m venv .venv
+   source .venv/bin/activate      # Windows: .venv\Scripts\activate
+   ```
 
-git clone https://github.com/seu-usuario/extracao-diesel-loginteli.git
+2. Instale as dependências:
 
-Entre na pasta:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-cd extracao-diesel-loginteli
+3. Ajuste, se necessário, as unidades e os períodos em `src/config.py`.
 
-Crie o ambiente virtual:
+4. Execute:
 
-python -m venv venv
+   ```bash
+   python main.py
+   ```
 
-Ative o ambiente:
+5. O resultado será gerado em `data/output/Precos_Diesel_<data-hora>.xlsx`.
 
-Windows:
+O andamento da execução fica registrado em `logs/execucao.log`, incluindo eventuais falhas de requisição (nesse caso, a linha correspondente fica com `VALOR_MEDIA` vazio, em vez de interromper toda a coleta).
 
-venv\Scripts\activate
+## 🧩 Adaptando para o seu cenário
 
-Linux/Mac:
+- **Unidades/estados**: edite `UNIDADES_POR_ESTADO` em `src/config.py`.
+- **Períodos**: edite `SEMANAS` em `src/config.py` (ou gere essa lista programaticamente, se preferir).
+- **Produto consultado**: ajuste `PRODUTO_PADRAO` em `src/config.py`.
+- **Velocidade da coleta**: ajuste `DELAY_ENTRE_REQUISICOES_SEGUNDOS` em `src/config.py` — um intervalo entre requisições ajuda a não sobrecarregar o site consultado.
 
-source venv/bin/activate
+## ✅ Testes
 
-Instale as dependências:
+Os testes usam HTML simulado e não fazem chamadas de rede reais:
 
-pip install -r requirements.txt
-
-
-▶️ Execução
-
-Execute o projeto:
-
-python src/main.py
-
-Ao final da execução será criado:
-
-data/diesel.db
-
-e os logs serão registrados em:
-
-logs/app.log
-🗄 Estrutura da Tabela
-
-Tabela:
-
-tb_preco_diesel
-
-Campos:
-
-Campo	Tipo
-UNIDADE	TEXT
-ESTADO	TEXT
-PERIODO	TEXT
-SEMANA	INTEGER
-VALOR_MEDIA	REAL
-DATA_INICIO	DATE
-DATA_FIM	DATE
-
-
-🔍 Exemplo de Consulta SQL
-
-Preço médio por estado:
-
-SELECT
-    ESTADO,
-    AVG(VALOR_MEDIA) AS PRECO_MEDIO
-FROM tb_preco_diesel
-GROUP BY ESTADO;
-
-Evolução semanal:
-
-SELECT
-    SEMANA,
-    AVG(VALOR_MEDIA) AS PRECO_MEDIO
-FROM tb_preco_diesel
-GROUP BY SEMANA
-ORDER BY SEMANA;
-
-
-📊 Possíveis Evoluções
-
-Integração com Power BI.
-Dashboard de acompanhamento do preço do diesel.
-Agendamento automático com Task Scheduler.
-Persistência incremental.
-API para consulta dos preços.
-Containerização com Docker.
-Pipeline CI/CD com GitHub Actions.
-
-
-🧪 Testes
-
-Executar os testes:
-
+```bash
 pytest
-💼 Aplicação de Negócio
+```
 
-Este projeto simula uma rotina comum em operações de Supply Chain e Transportes, onde indicadores externos, como o preço do combustível, precisam ser capturados automaticamente para análises de custos, planejamento logístico e tomada de decisão.
+## ⚠️ Uso responsável
 
+Este robô faz requisições HTTP simples (sem burlar proteções) a uma página pública. Antes de rodar em produção ou aumentar o volume de chamadas, vale revisar os termos de uso do site consultado e manter um intervalo razoável entre requisições (`DELAY_ENTRE_REQUISICOES_SEGUNDOS`).
 
-👨‍💻 Autor
+## 🛣️ Possíveis melhorias futuras
 
-Natan Gleison
+- Cache local dos resultados já coletados, para não repetir requisições em re-execuções.
+- Retry automático com backoff em caso de falha de rede.
+- Suporte a múltiplos produtos em uma única execução.
+- Mover `UNIDADES_POR_ESTADO` e `SEMANAS` para um arquivo de configuração externo (YAML/JSON).
 
-Analista de Dados com experiência em:
+## 📄 Licença
 
-Supply Chain
-Transportes
-Power BI
-SQL
-Python
-Automação de Processos
-Desenvolvimento de Dashboards
-
-[LinkedIn:](https://www.linkedin.com/in/natan-silva-3a14b6262/)
-
-GitHub: inserir perfil
+Este projeto está disponível sem uma licença definida. Adicione um arquivo `LICENSE` (ex.: MIT) se quiser deixar explícito o uso permitido por terceiros.
