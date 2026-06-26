@@ -106,6 +106,6 @@ Este robô faz requisições HTTP simples (sem burlar proteções) a uma página
 - Suporte a múltiplos produtos em uma única execução.
 - Mover `UNIDADES_POR_ESTADO` e `SEMANAS` para um arquivo de configuração externo (YAML/JSON).
 
-## 📄 Licença
 
-Este projeto está disponível sem uma licença definida. Adicione um arquivo `LICENSE` (ex.: MIT) se quiser deixar explícito o uso permitido por terceiros.
+
+
